@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="top">
+  <div>
+    <h1>Araç Kiralama Yönetim Paneli</h1>
+    <p>Araç ekle, fotoğraf yükle, günlük fiyat gir ve rezervasyon oluştur.</p>
+  </div>
+  <a class="btn" href="{{ url_for('add_car') }}">+ Yeni Araç</a>
+</header>
+
+<section class="stats">
+  <div class="stat"><span>Toplam Araç</span><b>{{ total }}</b></div>
+  <div class="stat"><span>Müsait</span><b>{{ available }}</b></div>
+  <div class="stat"><span>Kirada</span><b>{{ rented }}</b></div>
+</section>
+
+<h2>Araç Listesi</h2>
+<section class="grid">
+  {% for car in cars %}
+  <div class="card">
+    <div class="photo">
+      {% if car.image %}<img src="{{ url_for('static', filename='uploads/' + car.image) }}" alt="Araç">{% else %}<span>Resim Yok</span>{% endif %}
+    </div>
+    <div class="card-body">
+      <div class="row"><h3>{{ car.brand }} {{ car.model }}</h3><span class="badge {{ 'ok' if car.status == 'Müsait' else 'busy' }}">{{ car.status }}</span></div>
+      <p>{{ car.year or '-' }} • {{ car.plate or 'Plaka yok' }}</p>
+      <div class="price">₺{{ '%.2f'|format(car.daily_price) }} / gün</div>
+      <p class="notes">{{ car.notes }}</p>
+      <div class="actions">
+        <a class="btn small" href="{{ url_for('edit_car', car_id=car.id) }}">Düzenle</a>
+        <form method="post" action="{{ url_for('delete_car', car_id=car.id) }}" onsubmit="return confirm('Araç silinsin mi?')"><button class="btn danger small">Sil</button></form>
+      </div>
+      <form class="rent" method="post" action="{{ url_for('add_reservation') }}">
+        <input type="hidden" name="car_id" value="{{ car.id }}">
+        <input name="customer_name" placeholder="Müşteri adı" required>
+        <input name="phone" placeholder="Telefon">
+        <input type="date" name="start_date" required>
+        <input type="date" name="end_date" required>
+        <button class="btn small" type="submit">Kirala</button>
+      </form>
+    </div>
+  </div>
+  {% else %}
+  <div class="empty">Henüz araç eklenmedi.</div>
+  {% endfor %}
+</section>
+
+<h2>Son Rezervasyonlar</h2>
+<div class="table-card">
+<table>
+  <thead><tr><th>Araç</th><th>Müşteri</th><th>Tarih</th><th>Tutar</th><th>Durum</th><th></th></tr></thead>
+  <tbody>
+  {% for r in reservations %}
+    <tr>
+      <td>{{ r.brand }} {{ r.model }} / {{ r.plate }}</td>
+      <td>{{ r.customer_name }}<br><small>{{ r.phone }}</small></td>
+      <td>{{ r.start_date }} - {{ r.end_date }}</td>
+      <td>₺{{ '%.2f'|format(r.total_price or 0) }}</td>
+      <td>{{ r.status }}</td>
+      <td>{% if r.status == 'Aktif' %}<form method="post" action="{{ url_for('finish_reservation', reservation_id=r.id) }}"><button class="btn small">Bitir</button></form>{% endif %}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6">Rezervasyon yok.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}
