@@ -1,9 +1,3 @@
-services:
-  - type: web
-    name: arac-kiralama-server
-    env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
-    envVars:
-      - key: SECRET_KEY
-        generateValue: true
+Flask==3.0.3
+gunicorn==22.0.0
+Werkzeug==3.0.3

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="topbar">
+  <div>
+    <h1>Araç Kiralama Yönetim Paneli</h1>
+    <p>Fotoğraflı araç listesi, günlük fiyat ve müsaitlik takibi.</p>
+  </div>
+  <a class="btn" href="{{ url_for('new_car') }}">+ Araç Ekle</a>
+</div>
+
+<div class="stats">
+  <div class="stat"><span>Toplam Araç</span><strong>{{ total_cars }}</strong></div>
+  <div class="stat"><span>Müsait</span><strong>{{ available }}</strong></div>
+  <div class="stat"><span>Kirada</span><strong>{{ rented }}</strong></div>
+</div>
+
+<h2>Araçlar</h2>
+<div class="grid">
+{% for car in cars %}
+  <div class="card">
+    <div class="imagebox">
+      {% if car.image %}
+        <img src="{{ url_for('static', filename='uploads/' + car.image) }}" alt="Araç">
+      {% else %}
+        <div class="noimg">Resim Yok</div>
+      {% endif %}
+    </div>
+    <div class="cardbody">
+      <div class="row"><h3>{{ car.brand }} {{ car.model }}</h3><span class="badge {{ 'ok' if car.status == 'Müsait' else 'busy' }}">{{ car.status }}</span></div>
+      <p>Plaka: {{ car.plate or '-' }} | Yıl: {{ car.year or '-' }}</p>
+      <div class="price">{{ "%.0f"|format(car.daily_price) }} ₺ / Günlük</div>
+      <p class="note">{{ car.note or '' }}</p>
+      <div class="actions">
+        <a class="btn small" href="{{ url_for('edit_car', car_id=car.id) }}">Düzenle</a>
+        <form method="post" action="{{ url_for('delete_car', car_id=car.id) }}" onsubmit="return confirm('Araç silinsin mi?')">
+          <button class="btn danger small">Sil</button>
+        </form>
+      </div>
+    </div>
+  </div>
+{% else %}
+  <div class="empty">Henüz araç eklenmedi. Sağ üstten araç ekle.</div>
+{% endfor %}
+</div>
+
+<h2>Son Rezervasyonlar</h2>
+<div class="tablewrap">
+<table>
+  <tr><th>Müşteri</th><th>Araç</th><th>Tarih</th><th>Toplam</th><th>Durum</th></tr>
+  {% for r in reservations %}
+  <tr><td>{{ r.customer_name }}</td><td>{{ r.brand }} {{ r.model }}</td><td>{{ r.start_date }} / {{ r.end_date }}</td><td>{{ r.total_price }} ₺</td><td>{{ r.status }}</td></tr>
+  {% else %}<tr><td colspan="5">Rezervasyon yok.</td></tr>{% endfor %}
+</table>
+</div>
+{% endblock %}

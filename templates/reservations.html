@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Rezervasyonlar</h1>
+<form class="form" method="post">
+  <label>Araç
+    <select name="car_id" required>
+      <option value="">Araç seç</option>
+      {% for car in cars %}
+      <option value="{{ car.id }}">{{ car.brand }} {{ car.model }} - {{ car.plate or 'Plakasız' }} - {{ car.daily_price }} ₺</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Müşteri Adı<input name="customer_name" required></label>
+  <label>Telefon<input name="phone"></label>
+  <label>Başlangıç<input type="date" name="start_date" required></label>
+  <label>Bitiş<input type="date" name="end_date" required></label>
+  <label>Toplam Fiyat ₺<input type="number" step="0.01" name="total_price"></label>
+  <button class="btn full">Rezervasyon Ekle</button>
+</form>
+
+<div class="tablewrap">
+<table>
+  <tr><th>Müşteri</th><th>Telefon</th><th>Araç</th><th>Tarih</th><th>Toplam</th><th>Durum</th><th>İşlem</th></tr>
+  {% for r in reservations %}
+  <tr>
+    <td>{{ r.customer_name }}</td><td>{{ r.phone }}</td><td>{{ r.brand }} {{ r.model }} {{ r.plate or '' }}</td><td>{{ r.start_date }} / {{ r.end_date }}</td><td>{{ r.total_price }} ₺</td><td>{{ r.status }}</td>
+    <td>{% if r.status == 'Aktif' %}<form method="post" action="{{ url_for('finish_reservation', reservation_id=r.id) }}"><button class="btn small">Bitir</button></form>{% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="7">Rezervasyon yok.</td></tr>{% endfor %}
+</table>
+</div>
+{% endblock %}

@@ -1,44 +1,6 @@
-# Araç Kiralama Server
-
-Flask ile hazırlanmış araç kiralama yönetim paneli.
-
-## Özellikler
-- Araç ekleme / düzenleme / silme
-- Araç resmi yükleme
-- Günlük fiyat yazma
-- Müsait / Kirada durumu
-- Rezervasyon oluşturma ve tamamlama
-
-## Lokal çalıştırma
-
-```bash
-pip install -r requirements.txt
-python app.py
-```
-
-Adres:
-
-```text
-http://127.0.0.1:5000
-```
-
-## Render kurulumu
-
-1. Bu klasörü GitHub reposuna yükle.
-2. Render.com > New > Web Service seç.
-3. GitHub reposunu bağla.
-4. Ayarlar:
-   - Runtime: Python
-   - Build Command: `pip install -r requirements.txt`
-   - Start Command: `gunicorn app:app`
-5. Deploy yap.
-
-Render sana dışarıdan erişilebilir bir link verir. Örnek:
-
-```text
-https://arac-kiralama-server.onrender.com
-```
-
-## Önemli not
-
-Bu sürüm SQLite ve yerel dosya yükleme kullanır. Render ücretsiz planda dosyalar ve SQLite verisi kalıcı olmayabilir. Gerçek kullanımda Render Disk veya PostgreSQL eklenmelidir.
+services:
+  - type: web
+    name: rentacar-panel
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
