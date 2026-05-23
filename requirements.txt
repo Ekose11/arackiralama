@@ -1,3 +1,152 @@
-Flask==3.0.3
-gunicorn==22.0.0
-Werkzeug==3.0.3
+import os
+import sqlite3
+from datetime import datetime
+from flask import Flask, render_template, request, redirect, url_for, flash
+from werkzeug.utils import secure_filename
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "rentacar.db")
+UPLOAD_FOLDER = os.path.join(BASE_DIR, "static", "uploads")
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "gif"}
+
+app = Flask(__name__)
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "rentacar-secret")
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+def allowed_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    db = get_db()
+    db.execute("""
+    CREATE TABLE IF NOT EXISTS cars (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        brand TEXT NOT NULL,
+        model TEXT NOT NULL,
+        plate TEXT,
+        year INTEGER,
+        daily_price REAL NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'Müsait',
+        image TEXT,
+        created_at TEXT NOT NULL
+    )
+    """)
+    db.execute("""
+    CREATE TABLE IF NOT EXISTS reservations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        car_id INTEGER NOT NULL,
+        customer_name TEXT NOT NULL,
+        phone TEXT,
+        start_date TEXT NOT NULL,
+        end_date TEXT NOT NULL,
+        note TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY(car_id) REFERENCES cars(id)
+    )
+    """)
+    db.commit()
+    db.close()
+
+@app.before_request
+def before_request():
+    init_db()
+
+@app.route("/")
+def index():
+    db = get_db()
+    cars = db.execute("SELECT * FROM cars ORDER BY id DESC").fetchall()
+    total = db.execute("SELECT COUNT(*) c FROM cars").fetchone()["c"]
+    available = db.execute("SELECT COUNT(*) c FROM cars WHERE status='Müsait'").fetchone()["c"]
+    rented = db.execute("SELECT COUNT(*) c FROM cars WHERE status='Kirada'").fetchone()["c"]
+    db.close()
+    return render_template("index.html", cars=cars, total=total, available=available, rented=rented)
+
+@app.route("/add", methods=["GET", "POST"])
+def add_car():
+    if request.method == "POST":
+        brand = request.form.get("brand", "").strip()
+        model = request.form.get("model", "").strip()
+        plate = request.form.get("plate", "").strip()
+        year = request.form.get("year") or None
+        daily_price = request.form.get("daily_price") or 0
+        status = request.form.get("status", "Müsait")
+        image_name = None
+        file = request.files.get("image")
+        if file and file.filename and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            image_name = f"{int(datetime.now().timestamp())}_{filename}"
+            file.save(os.path.join(app.config["UPLOAD_FOLDER"], image_name))
+        if not brand or not model:
+            flash("Marka ve model zorunlu.", "error")
+            return redirect(url_for("add_car"))
+        db = get_db()
+        db.execute("INSERT INTO cars (brand, model, plate, year, daily_price, status, image, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                   (brand, model, plate, year, daily_price, status, image_name, datetime.now().strftime("%d.%m.%Y %H:%M")))
+        db.commit(); db.close()
+        return redirect(url_for("index"))
+    return render_template("car_form.html", car=None)
+
+@app.route("/edit/<int:car_id>", methods=["GET", "POST"])
+def edit_car(car_id):
+    db = get_db()
+    car = db.execute("SELECT * FROM cars WHERE id=?", (car_id,)).fetchone()
+    if not car:
+        db.close(); return redirect(url_for("index"))
+    if request.method == "POST":
+        image_name = car["image"]
+        file = request.files.get("image")
+        if file and file.filename and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            image_name = f"{int(datetime.now().timestamp())}_{filename}"
+            file.save(os.path.join(app.config["UPLOAD_FOLDER"], image_name))
+        db.execute("UPDATE cars SET brand=?, model=?, plate=?, year=?, daily_price=?, status=?, image=? WHERE id=?",
+                   (request.form.get("brand"), request.form.get("model"), request.form.get("plate"), request.form.get("year") or None, request.form.get("daily_price") or 0, request.form.get("status"), image_name, car_id))
+        db.commit(); db.close()
+        return redirect(url_for("index"))
+    db.close()
+    return render_template("car_form.html", car=car)
+
+@app.route("/delete/<int:car_id>", methods=["POST"])
+def delete_car(car_id):
+    db = get_db()
+    db.execute("DELETE FROM reservations WHERE car_id=?", (car_id,))
+    db.execute("DELETE FROM cars WHERE id=?", (car_id,))
+    db.commit(); db.close()
+    return redirect(url_for("index"))
+
+@app.route("/reservations", methods=["GET", "POST"])
+def reservations():
+    db = get_db()
+    if request.method == "POST":
+        car_id = request.form.get("car_id")
+        db.execute("INSERT INTO reservations (car_id, customer_name, phone, start_date, end_date, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                   (car_id, request.form.get("customer_name"), request.form.get("phone"), request.form.get("start_date"), request.form.get("end_date"), request.form.get("note"), datetime.now().strftime("%d.%m.%Y %H:%M")))
+        db.execute("UPDATE cars SET status='Kirada' WHERE id=?", (car_id,))
+        db.commit()
+        return redirect(url_for("reservations"))
+    cars = db.execute("SELECT * FROM cars ORDER BY brand, model").fetchall()
+    rows = db.execute("SELECT r.*, c.brand, c.model, c.plate FROM reservations r JOIN cars c ON c.id=r.car_id ORDER BY r.id DESC").fetchall()
+    db.close()
+    return render_template("reservations.html", cars=cars, reservations=rows)
+
+@app.route("/reservation/delete/<int:res_id>", methods=["POST"])
+def delete_reservation(res_id):
+    db = get_db()
+    row = db.execute("SELECT car_id FROM reservations WHERE id=?", (res_id,)).fetchone()
+    if row:
+        db.execute("DELETE FROM reservations WHERE id=?", (res_id,))
+        db.execute("UPDATE cars SET status='Müsait' WHERE id=?", (row["car_id"],))
+        db.commit()
+    db.close()
+    return redirect(url_for("reservations"))
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)

@@ -1,6 +1,4 @@
-services:
-  - type: web
-    name: rentacar-panel
-    env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+__pycache__/
+*.pyc
+rentacar.db
+.env
