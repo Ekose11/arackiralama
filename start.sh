@@ -1,7 +1,2 @@
-services:
-  - type: web
-    name: arac-kiralama-panel
-    env: python
-    plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: python -m gunicorn app:app --bind 0.0.0.0:$PORT
+#!/usr/bin/env bash
+python3 -m gunicorn app:app --bind 0.0.0.0:${PORT:-10000}
