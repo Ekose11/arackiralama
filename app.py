@@ -2,7 +2,7 @@ import os
 import sqlite3
 from datetime import datetime
 from werkzeug.utils import secure_filename
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "static", "uploads")
@@ -14,10 +14,10 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "arac-kiralama-secret")
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 
 
-def allowed_file(filename):
+def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
@@ -29,8 +29,7 @@ def get_db():
 
 def init_db():
     conn = get_db()
-    conn.execute(
-        """
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS cars (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             brand TEXT NOT NULL,
@@ -42,10 +41,8 @@ def init_db():
             image TEXT,
             created_at TEXT NOT NULL
         )
-        """
-    )
-    conn.execute(
-        """
+    """)
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS reservations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             car_id INTEGER NOT NULL,
@@ -57,30 +54,32 @@ def init_db():
             created_at TEXT NOT NULL,
             FOREIGN KEY(car_id) REFERENCES cars(id)
         )
-        """
-    )
+    """)
     conn.commit()
     conn.close()
 
 
 @app.before_request
-def before_request():
+def setup_database():
     init_db()
+
+
+@app.route("/health")
+def health():
+    return jsonify({"ok": True, "time": datetime.now().isoformat()})
 
 
 @app.route("/")
 def index():
     conn = get_db()
     cars = conn.execute("SELECT * FROM cars ORDER BY id DESC").fetchall()
-    reservations = conn.execute(
-        """
+    reservations = conn.execute("""
         SELECT reservations.*, cars.brand, cars.model, cars.plate
         FROM reservations
         JOIN cars ON cars.id = reservations.car_id
         ORDER BY reservations.id DESC
-        LIMIT 20
-        """
-    ).fetchall()
+        LIMIT 30
+    """).fetchall()
     conn.close()
     return render_template("index.html", cars=cars, reservations=reservations)
 
@@ -102,26 +101,23 @@ def add_car():
     try:
         daily_price_value = float(daily_price)
     except ValueError:
-        daily_price_value = 0
+        flash("Günlük fiyat sayı olmalı.")
+        return redirect(url_for("index"))
 
     image_name = None
     if image_file and image_file.filename:
-        if allowed_file(image_file.filename):
-            safe_name = secure_filename(image_file.filename)
-            image_name = f"{int(datetime.now().timestamp())}_{safe_name}"
-            image_file.save(os.path.join(app.config["UPLOAD_FOLDER"], image_name))
-        else:
-            flash("Sadece jpg, png, webp, gif yükleyebilirsin.")
+        if not allowed_file(image_file.filename):
+            flash("Sadece jpg, jpeg, png, webp veya gif yükleyebilirsin.")
             return redirect(url_for("index"))
+        safe_name = secure_filename(image_file.filename)
+        image_name = f"{int(datetime.now().timestamp())}_{safe_name}"
+        image_file.save(os.path.join(app.config["UPLOAD_FOLDER"], image_name))
 
     conn = get_db()
-    conn.execute(
-        """
+    conn.execute("""
         INSERT INTO cars (brand, model, plate, year, daily_price, status, image, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (brand, model, plate, year, daily_price_value, status, image_name, datetime.now().strftime("%Y-%m-%d %H:%M")),
-    )
+    """, (brand, model, plate, year, daily_price_value, status, image_name, datetime.now().strftime("%Y-%m-%d %H:%M")))
     conn.commit()
     conn.close()
     return redirect(url_for("index"))
@@ -129,7 +125,8 @@ def add_car():
 
 @app.route("/status/<int:car_id>/<status>")
 def change_status(car_id, status):
-    if status not in ["Müsait", "Kirada", "Bakımda"]:
+    allowed_statuses = ["Müsait", "Kirada", "Bakımda"]
+    if status not in allowed_statuses:
         status = "Müsait"
     conn = get_db()
     conn.execute("UPDATE cars SET status=? WHERE id=?", (status, car_id))
@@ -146,11 +143,12 @@ def delete_car(car_id):
     conn.execute("DELETE FROM cars WHERE id=?", (car_id,))
     conn.commit()
     conn.close()
+
     if car and car["image"]:
-        path = os.path.join(UPLOAD_FOLDER, car["image"])
-        if os.path.exists(path):
+        image_path = os.path.join(UPLOAD_FOLDER, car["image"])
+        if os.path.exists(image_path):
             try:
-                os.remove(path)
+                os.remove(image_path)
             except OSError:
                 pass
     return redirect(url_for("index"))
@@ -169,13 +167,10 @@ def reserve(car_id):
         return redirect(url_for("index"))
 
     conn = get_db()
-    conn.execute(
-        """
+    conn.execute("""
         INSERT INTO reservations (car_id, customer_name, phone, start_date, end_date, note, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-        """,
-        (car_id, customer_name, phone, start_date, end_date, note, datetime.now().strftime("%Y-%m-%d %H:%M")),
-    )
+    """, (car_id, customer_name, phone, start_date, end_date, note, datetime.now().strftime("%Y-%m-%d %H:%M")))
     conn.execute("UPDATE cars SET status='Kirada' WHERE id=?", (car_id,))
     conn.commit()
     conn.close()
@@ -183,5 +178,6 @@ def reserve(car_id):
 
 
 if __name__ == "__main__":
+    init_db()
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port, debug=False)

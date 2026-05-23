@@ -11,7 +11,8 @@
     <aside>
       <h1>Araç Kiralama</h1>
       <p>Yönetim Paneli</p>
-      <div class="stat">Toplam Araç: <b>{{ cars|length }}</b></div>
+      <div class="stat"><span>Toplam Araç</span><b>{{ cars|length }}</b></div>
+      <a class="health" href="/health">Server Test</a>
     </aside>
     <main>
       {% with messages = get_flashed_messages() %}
@@ -32,7 +33,7 @@
             <option>Bakımda</option>
           </select>
           <input type="file" name="image" accept="image/*">
-          <button>Aracı Kaydet</button>
+          <button type="submit">Aracı Kaydet</button>
         </form>
       </section>
 
@@ -55,7 +56,7 @@
               <a href="/status/{{ car.id }}/Müsait">Müsait</a>
               <a href="/status/{{ car.id }}/Kirada">Kirada</a>
               <a href="/status/{{ car.id }}/Bakımda">Bakımda</a>
-              <a class="danger" href="/delete/{{ car.id }}" onclick="return confirm('Silinsin mi?')">Sil</a>
+              <a class="danger" href="/delete/{{ car.id }}" onclick="return confirm('Araç silinsin mi?')">Sil</a>
             </div>
             <form action="/reserve/{{ car.id }}" method="post" class="reserve">
               <input name="customer_name" placeholder="Müşteri adı" required>
@@ -63,7 +64,7 @@
               <input type="date" name="start_date">
               <input type="date" name="end_date">
               <input name="note" placeholder="Not">
-              <button>Rezervasyon Yap</button>
+              <button type="submit">Rezervasyon Yap</button>
             </form>
           </div>
         </div>
@@ -78,12 +79,12 @@
           {% for r in reservations %}
           <div class="row">
             <span>{{ r.customer_name }}</span>
+            <span>{{ r.phone or '-' }}</span>
             <span>{{ r.brand }} {{ r.model }}</span>
-            <span>{{ r.start_date }} - {{ r.end_date }}</span>
-            <span>{{ r.phone }}</span>
+            <span>{{ r.start_date or '-' }} / {{ r.end_date or '-' }}</span>
           </div>
           {% else %}
-          <p>Rezervasyon yok.</p>
+          <div class="empty small">Rezervasyon yok.</div>
           {% endfor %}
         </div>
       </section>

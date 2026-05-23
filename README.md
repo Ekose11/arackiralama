@@ -1,22 +1,11 @@
-# Rent A Car Panel
+# Araç Kiralama Server
 
-Render + GitHub uyumlu Flask araç kiralama paneli.
+Render ayarları:
 
-## Local çalıştırma
-```bash
-pip install -r requirements.txt
-python app.py
-```
-
-## Render ayarları
 Build Command:
-```bash
-pip install -r requirements.txt
-```
+python3 -m pip install --upgrade pip && python3 -m pip install -r requirements.txt
 
 Start Command:
-```bash
-gunicorn app:app
-```
+gunicorn app:app --bind 0.0.0.0:$PORT
 
-Not: Render ücretsiz planda SQLite ve yüklenen resimler yeniden deploy/sleep sonrası kalıcı olmayabilir. Gerçek kullanımda PostgreSQL ve cloud storage önerilir.
+Önemli: Render'da servis tipi **Web Service**, runtime **Python** olmalı. GitHub'a zip dosyasını değil, zip içindeki dosyaları yükleyin.
